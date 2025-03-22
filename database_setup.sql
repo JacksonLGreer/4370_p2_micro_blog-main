@@ -17,3 +17,12 @@ create table if not exists user (
     constraint lastName_min_length check (char_length(trim(lastName)) >= 2)
 );
 
+create table if not exists post (
+    postId INT AUTO_INCREMENT,     
+    userId INT NOT NULL,
+    postDate VARCHAR(255) NOT NULL,             
+    postText TEXT NOT NULL,
+    PRIMARY KEY (postId),
+    FOREIGN KEY (userId) REFERENCES user(userId)
+);
+

@@ -7,7 +7,18 @@ package uga.menik.cs4370.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.Timestamp;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+
+import javax.sql.DataSource;
+
+
+import java.sql.Connection;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +29,8 @@ import org.springframework.web.servlet.ModelAndView;
 
 import uga.menik.cs4370.models.Post;
 import uga.menik.cs4370.utility.Utility;
-
+import uga.menik.cs4370.services.UserService;
+import uga.menik.cs4370.models.User;
 /**
  * This controller handles the home page and some of it's sub URLs.
  */
@@ -26,6 +38,13 @@ import uga.menik.cs4370.utility.Utility;
 @RequestMapping
 public class HomeController {
 
+    // setup datasource
+    private final DataSource dataSource;
+    private final UserService userService;
+    public HomeController(DataSource dataSource, UserService userService) {
+        this.dataSource = dataSource;
+        this.userService = userService;
+    }
     /**
      * This is the specific function that handles the root URL itself.
      * 
@@ -71,6 +90,25 @@ public class HomeController {
         // Redirect the user if the post creation is a success.
         // return "redirect:/";
 
+        // Implementation by Jackson
+        User user = userService.getLoggedInUser();
+
+        String insertQuery = "INSERT INTO post (userId, postDate, postText) VALUES (?, ?, ?)";
+
+        try (Connection conn = dataSource.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(insertQuery)) {
+                pstmt.setString(1, user.getUserId());
+                String uploadTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy, hh:mm a"));
+                pstmt.setString(2, uploadTime);
+                pstmt.setString(3, postText);
+
+                int rowsAffected = pstmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    return "redirect:/";
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            };
         // Redirect the user with an error message if there was an error.
         String message = URLEncoder.encode("Failed to create the post. Please try again.",
                 StandardCharsets.UTF_8);
