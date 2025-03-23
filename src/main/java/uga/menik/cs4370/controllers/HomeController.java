@@ -9,11 +9,16 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Timestamp;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
@@ -92,20 +97,46 @@ public class HomeController {
 
         // Implementation by Jackson
         User user = userService.getLoggedInUser();
-
+        // Queries
         String insertQuery = "INSERT INTO post (userId, postDate, postText) VALUES (?, ?, ?)";
-
+        String fetchPostIdQuery = "SELECT LAST_INSERT_ID()";
+        String insertHashtagQuery = "INSERT INTO hashtag (hashTag, postId) VALUES (?, ?)";
+        // Connect to database
         try (Connection conn = dataSource.getConnection();
+            // Create a prepared statement to send to DB
             PreparedStatement pstmt = conn.prepareStatement(insertQuery)) {
                 pstmt.setString(1, user.getUserId());
                 String uploadTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMM dd, yyyy, hh:mm a"));
                 pstmt.setString(2, uploadTime);
                 pstmt.setString(3, postText);
-
                 int rowsAffected = pstmt.executeUpdate();
+                // If upload successful then enter if
                 if (rowsAffected > 0) {
-                    return "redirect:/";
+                    // Get the post ID from the new post so we can make FK to hashtag
+                    int postId = -1;
+                    try (PreparedStatement idStmt = conn.prepareStatement(fetchPostIdQuery)) {
+                        ResultSet rs = idStmt.executeQuery();
+                        if (rs.next()) {
+                            postId = rs.getInt(1);
+                        }
+                    }
+                    if (postId > 0) {
+                         // Extract the hashtags and then put them into the hashtag table
+                        List<String> hashtags = extractHashtags(postText);
+                        try (PreparedStatement hashtagStmt = conn.prepareStatement(insertHashtagQuery)) {
+                            for (String hashtag : hashtags) {
+                                hashtagStmt.setString(1, hashtag);
+                                hashtagStmt.setInt(2, postId);
+                                hashtagStmt.executeUpdate();
+                            }
+                        } catch (SQLException e) {
+                            e.printStackTrace();
+                        }
+                        return "redirect:/";
+                    }
+                   
                 }
+                
             } catch (SQLException e) {
                 e.printStackTrace();
             };
@@ -113,6 +144,22 @@ public class HomeController {
         String message = URLEncoder.encode("Failed to create the post. Please try again.",
                 StandardCharsets.UTF_8);
         return "redirect:/?error=" + message;
+    }
+
+    /**
+     * Function to extract hashtags from the postText
+     * @param postText - The text from the post to be parsed through
+     * @return Array list containing all the hashtag text
+     */
+    public List<String> extractHashtags(String postText) {
+        Pattern hashtagPat = Pattern.compile("#(\\S+)");
+        Matcher mat = hashtagPat.matcher(postText);
+        List<String> hashtags = new ArrayList<String>();
+        while (mat.find()) {
+            //System.out.println(mat.group(1));
+            hashtags.add(mat.group(1));
+        }
+        return hashtags;
     }
 
 }
