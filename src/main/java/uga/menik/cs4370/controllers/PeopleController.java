@@ -8,7 +8,12 @@ package uga.menik.cs4370.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.List;
+
+import javax.sql.DataSource;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
@@ -36,10 +41,12 @@ public class PeopleController {
     // Hint: Add a constructor with @Autowired annotation.
     private final UserService userService;
     private final PeopleService peopleService;
+    private final DataSource dataSource;
 
-    public PeopleController (UserService userService, PeopleService peopleService) {
+    public PeopleController (UserService userService, PeopleService peopleService, DataSource dataSource) {
         this.userService = userService;
         this.peopleService = peopleService;
+        this.dataSource = dataSource;
     }
     /**
      * Serves the /people web page.
@@ -94,6 +101,41 @@ public class PeopleController {
 
         // Redirect the user if the comment adding is a success.
         // return "redirect:/people";
+
+        // Implementation by Jackson
+        User loggedInUser = userService.getLoggedInUser();
+        String loggedInUserId = loggedInUser.getUserId();
+
+        // Ensuring this is not a self-follow
+        if (loggedInUserId.equals(userId)) {
+            String errorMessage = URLEncoder.encode("You cannot follow yourself.",StandardCharsets.UTF_8);
+            return "redirect:/people?error=" + errorMessage;
+        }
+
+        // Connect to DB
+        try (Connection conn = dataSource.getConnection()) {
+            if (isFollow) {
+                // Following a user
+                String followQuery = "INSERT INTO follow (followerUserId, followeeUserId) VALUES (?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(followQuery)) {
+                    pstmt.setString(1, loggedInUserId);
+                    pstmt.setString(2, userId);
+                    pstmt.executeUpdate();
+                }
+
+            } else {
+                // Unfollow a user
+                String unfollowQuery = "DELETE FROM follow WHERE followerUserId = ? AND followeeUserId = ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(unfollowQuery)) {
+                    pstmt.setString(1, loggedInUserId);
+                    pstmt.setString(2, userId);
+                    pstmt.executeUpdate();
+                } 
+            }
+            return "redirect:/people";
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
 
         // Redirect the user with an error message if there was an error.
         String message = URLEncoder.encode("Failed to (un)follow the user. Please try again.",

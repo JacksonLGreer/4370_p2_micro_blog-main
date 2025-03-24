@@ -67,6 +67,10 @@ public class PeopleService {
         return followableUsers;
     }
 
+    /** Used to get a list of all users that are not the current one
+     * @param - String loggedInUserId
+     * @return - List of users who are not the current one
+     */
     public List<FollowableUser> getAllUsersExceptCurrent(String loggedInUserId) {
         List<FollowableUser> users = new ArrayList<FollowableUser>();
 
