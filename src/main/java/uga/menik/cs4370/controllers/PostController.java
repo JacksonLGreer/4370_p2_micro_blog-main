@@ -7,7 +7,12 @@ package uga.menik.cs4370.controllers;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.List;
+
+import javax.sql.DataSource;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +22,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.ModelAndView;
 
+import com.mysql.cj.x.protobuf.MysqlxPrepare.Prepare;
+
 import uga.menik.cs4370.models.ExpandedPost;
+import uga.menik.cs4370.models.User;
+import uga.menik.cs4370.services.PeopleService;
+import uga.menik.cs4370.services.UserService;
 import uga.menik.cs4370.utility.Utility;
 
 /**
@@ -26,6 +36,16 @@ import uga.menik.cs4370.utility.Utility;
 @Controller
 @RequestMapping("/post")
 public class PostController {
+
+    private final UserService userService;
+    private final PeopleService peopleService;
+    private final DataSource dataSource;
+
+    public PostController (UserService userService, PeopleService peopleService, DataSource dataSource) {
+        this.userService = userService;
+        this.peopleService = peopleService;
+        this.dataSource = dataSource;
+    }
 
     /**
      * This function handles the /post/{postId} URL.
@@ -122,6 +142,33 @@ public class PostController {
         // Redirect the user if the comment adding is a success.
         // return "redirect:/post/" + postId;
 
+        // Implementation by Jackson
+        User loggedInUser = userService.getLoggedInUser();
+        String userId = loggedInUser.getUserId();
+
+        //connect to DB
+        try (Connection conn = dataSource.getConnection()) {
+            if (isAdd) {
+                //Adding a bookmark
+                String addBookmarkQuery = "INSERT IGNORE INTO bookmark (postId, userId) VALUES (?, ?)";
+                try (PreparedStatement pstmt = conn.prepareStatement(addBookmarkQuery)) {
+                    pstmt.setString(1, postId);
+                    pstmt.setString(2, userId);
+                    pstmt.executeUpdate();
+                }
+            } else {
+                // Removing a bookmark
+                String removeBookmarkQuery = "DELETE FROM bookmark WHERE postId = ? and userid = ?";
+                try (PreparedStatement pstmt = conn.prepareStatement(removeBookmarkQuery)) {
+                    pstmt.setString(1, postId);
+                    pstmt.setString(2, userId);
+                    pstmt.executeUpdate();
+                }
+            } // ifelse
+            return "redirect:/post/" + postId;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }// trycatch
         // Redirect the user with an error message if there was an error.
         String message = URLEncoder.encode("Failed to (un)bookmark the post. Please try again.",
                 StandardCharsets.UTF_8);
