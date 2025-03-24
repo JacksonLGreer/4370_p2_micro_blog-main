@@ -11,9 +11,10 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import uga.menik.cs4370.models.Post;
 import uga.menik.cs4370.utility.Utility;
+import uga.menik.cs4370.services.UserService;
 
 /**
  * Handles /bookmarks and its sub URLs.
@@ -22,9 +23,19 @@ import uga.menik.cs4370.utility.Utility;
  * Learn more about @Controller here: 
  * https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller.html
  */
+
+
 @Controller
 @RequestMapping("/bookmarks")
 public class BookmarksController {
+
+    private final UserService userService;
+
+    @Autowired
+    public BookmarksController(UserService userService) {
+        this.userService = userService;
+    }
+
 
     /**
      * /bookmarks URL itself is handled by this.
@@ -38,9 +49,19 @@ public class BookmarksController {
 
         // Following line populates sample data.
         // You should replace it with actual data from the database.
-        List<Post> posts = Utility.createSamplePostsListWithoutComments();
-        mv.addObject("posts", posts);
+        try {
+            String userId = userService.getLoggedInUser().getUserId();
+            List<Post> posts = userService.getBookmarkedPosts(userId);
 
+            if (posts.isEmpty()) {
+                mv.addObject("isNoContent", true);
+            } else {
+                mv.addObject("posts", posts);
+            }
+
+        } catch (Exception e) {
+            mv.addObject("errorMessage", "Failed to load bookmarked posts.");
+        }
         // If an error occured, you can set the following property with the
         // error message to show the error message to the user.
         // String errorMessage = "Some error occured!";
