@@ -67,7 +67,6 @@ public class HashtagSearchController {
         String[] hashtagArray = hashtags.split(regex);
         for(int j = 0; j <hashtagArray.length; j++) {
             hashtagArray[j] = hashtagArray[j].substring(1);
-            System.out.println(hashtagArray[j]);
         }
         // Creating a dynamic SQL query to get posts that contain all hashtags that were searched
         //
@@ -83,7 +82,6 @@ public class HashtagSearchController {
                 JOIN hashtag h ON p.postId = h.postId
                 WHERE h.hashTag IN (""" + placeholders +") GROUP BY p.postId HAVING COUNT(DISTINCT h.hashtag) = ? ORDER BY p.postDate DESC";
         
-        System.out.println(hashtagQuery);
        
 
         // List for holding the posts that meet the criteria
