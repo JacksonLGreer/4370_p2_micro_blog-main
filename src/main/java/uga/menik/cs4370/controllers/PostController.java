@@ -5,11 +5,17 @@ This is a project developed by Dr. Menik to give the students an opportunity to 
 */
 package uga.menik.cs4370.controllers;
 
+import java.util.*;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+import javax.sql.DataSource;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +25,7 @@ import org.springframework.web.servlet.ModelAndView;
 
 import uga.menik.cs4370.models.ExpandedPost;
 import uga.menik.cs4370.utility.Utility;
+import uga.menik.cs4370.services.UserService;
 
 /**
  * Handles /post URL and its sub urls.
@@ -27,6 +34,14 @@ import uga.menik.cs4370.utility.Utility;
 @RequestMapping("/post")
 public class PostController {
 
+    private final UserService userService;
+    private final DataSource dataSource;
+
+    @Autowired
+    public PostController(UserService userService, DataSource dataSource) {
+        this.userService = userService;
+        this.dataSource = dataSource;
+    }
     /**
      * This function handles the /post/{postId} URL.
      * This handlers serves the web page for a specific post.
@@ -34,12 +49,12 @@ public class PostController {
      * An example URL handled by this function looks like below:
      * http://localhost:8081/post/1
      * The above URL assigns 1 to postId.
-     * 
+     * <p>
      * See notes from HomeController.java regardig error URL parameter.
      */
     @GetMapping("/{postId}")
     public ModelAndView webpage(@PathVariable("postId") String postId,
-            @RequestParam(name = "error", required = false) String error) {
+                                @RequestParam(name = "error", required = false) String error) {
         System.out.println("The user is attempting to view post with id: " + postId);
         // See notes on ModelAndView in BookmarksController.java.
         ModelAndView mv = new ModelAndView("posts_page");
@@ -70,7 +85,7 @@ public class PostController {
      */
     @PostMapping("/{postId}/comment")
     public String postComment(@PathVariable("postId") String postId,
-            @RequestParam(name = "comment") String comment) {
+                              @RequestParam(name = "comment") String comment) {
         System.out.println("The user is attempting add a comment:");
         System.out.println("\tpostId: " + postId);
         System.out.println("\tcomment: " + comment);
@@ -87,45 +102,68 @@ public class PostController {
     /**
      * Handles likes added on posts.
      * See comments on webpage function to see how path variables work here.
-     * See comments in PeopleController.java in followUnfollowUser function regarding 
+     * See comments in PeopleController.java in followUnfollowUser function regarding
      * get type form submissions and how path variables work.
      */
     @GetMapping("/{postId}/heart/{isAdd}")
     public String addOrRemoveHeart(@PathVariable("postId") String postId,
-            @PathVariable("isAdd") Boolean isAdd) {
-        System.out.println("The user is attempting add or remove a heart:");
-        System.out.println("\tpostId: " + postId);
-        System.out.println("\tisAdd: " + isAdd);
+                                   @PathVariable("isAdd") Boolean isAdd) {
+        String userId = userService.getLoggedInUser().getUserId();
+        String sql;
 
-        // Redirect the user if the comment adding is a success.
-        // return "redirect:/post/" + postId;
+        try (Connection conn = dataSource.getConnection()) {
+            if (isAdd) {
+                sql = "INSERT IGNORE INTO heart (postId, userId) VALUES (?, ?)";
+            } else {
+                sql = "DELETE FROM heart WHERE postId = ? AND userId = ?";
+            }
 
-        // Redirect the user with an error message if there was an error.
-        String message = URLEncoder.encode("Failed to (un)like the post. Please try again.",
-                StandardCharsets.UTF_8);
-        return "redirect:/post/" + postId + "?error=" + message;
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, postId);
+                stmt.setString(2, userId);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            String message = URLEncoder.encode("Failed to (un)like the post. Please try again.", StandardCharsets.UTF_8);
+            return "redirect:/post/" + postId + "?error=" + message;
+        }
+
+        return "redirect:/post/" + postId;
     }
+
 
     /**
      * Handles bookmarking posts.
      * See comments on webpage function to see how path variables work here.
-     * See comments in PeopleController.java in followUnfollowUser function regarding 
+     * See comments in PeopleController.java in followUnfollowUser function regarding
      * get type form submissions.
      */
     @GetMapping("/{postId}/bookmark/{isAdd}")
     public String addOrRemoveBookmark(@PathVariable("postId") String postId,
-            @PathVariable("isAdd") Boolean isAdd) {
-        System.out.println("The user is attempting add or remove a bookmark:");
-        System.out.println("\tpostId: " + postId);
-        System.out.println("\tisAdd: " + isAdd);
+                                      @PathVariable("isAdd") Boolean isAdd) {
+        String userId = userService.getLoggedInUser().getUserId();
+        String sql;
 
-        // Redirect the user if the comment adding is a success.
-        // return "redirect:/post/" + postId;
+        try (Connection conn = dataSource.getConnection()) {
+            if (isAdd) {
+                sql = "INSERT IGNORE INTO bookmark (postId, userId) VALUES (?, ?)";
+            } else {
+                sql = "DELETE FROM bookmark WHERE postId = ? AND userId = ?";
+            }
 
-        // Redirect the user with an error message if there was an error.
-        String message = URLEncoder.encode("Failed to (un)bookmark the post. Please try again.",
-                StandardCharsets.UTF_8);
-        return "redirect:/post/" + postId + "?error=" + message;
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, postId);
+                stmt.setString(2, userId);
+                stmt.executeUpdate();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            String message = URLEncoder.encode("Failed to (un)bookmark the post. Please try again.", StandardCharsets.UTF_8);
+            return "redirect:/post/" + postId + "?error=" + message;
+        }
+
+        // Default redirect if everything succeeded
+        return "redirect:/post/" + postId;
     }
-
 }
