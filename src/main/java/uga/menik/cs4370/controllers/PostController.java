@@ -11,7 +11,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+<<<<<<< HEAD
 import java.util.*;
+=======
+import java.util.ArrayList;
+import java.util.List;
+>>>>>>> 0907557 (profile stuff)
 
 import javax.sql.DataSource;
 
@@ -25,7 +30,11 @@ import org.springframework.web.servlet.ModelAndView;
 
 import com.mysql.cj.x.protobuf.MysqlxPrepare.Prepare;
 
+<<<<<<< HEAD
 import uga.menik.cs4370.models.Comment;
+=======
+import uga.menik.cs4370.models.BasicPost;
+>>>>>>> 0907557 (profile stuff)
 import uga.menik.cs4370.models.ExpandedPost;
 import uga.menik.cs4370.models.User;
 import uga.menik.cs4370.services.PeopleService;
@@ -68,6 +77,12 @@ public class PostController {
 
         // Following line populates sample data.
         // You should replace it with actual data from the database.
+<<<<<<< HEAD
+=======
+        System.out.println("Calling getPostsOrderedByDate for userId: " + postId); 
+        List<BasicPost> posts = getPostsOrderedByDate(postId);
+        mv.addObject("posts", posts);
+>>>>>>> 0907557 (profile stuff)
 
         String postQuery = """
                 SELECT p.postId, p.userId, p.postDate, p.postText, u.username, u.firstName, u.lastName,
@@ -166,6 +181,54 @@ public class PostController {
         return mv;
     }
 
+    private List<BasicPost> getPostsOrderedByDate(String userId) {
+        List<BasicPost> posts = new ArrayList<>();
+        System.out.println("Inside getPostsOrderedByDate method"); 
+        // Simplified query to fetch post details
+        String sql = "SELECT p.postId, p.content, p.postDate, p.userId, u.firstName, u.lastName " +
+                     "FROM posts p " +
+                     "JOIN users u ON p.userId = u.userId " +
+                     "WHERE p.userId = ? ORDER BY p.postDate DESC";
+    
+        System.out.println("SQL Query: " + sql);  // Log the query
+    System.out.println("User ID: " + userId);  // Log the userId passed to the query
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, userId);
+    
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    // Get user details
+                    String postUserId = rs.getString("userId");
+                    String firstName = rs.getString("firstName");
+                    String lastName = rs.getString("lastName");
+                    User user = new User(postUserId, firstName, lastName);
+    
+                    // Get post details
+                    String postId = rs.getString("postId");
+                    String content = rs.getString("content");
+                    String postDate = rs.getString("postDate");
+    
+                    // Create BasicPost object and add to the list
+                    BasicPost post = new BasicPost(postId, content, postDate, user);
+                    posts.add(post);
+
+                    System.out.println("Post ID: " + postId);
+                    System.out.println("Content: " + content);
+                    System.out.println("Post Date: " + postDate);
+                    System.out.println("User: " + firstName + " " + lastName);
+                    System.out.println("-----");
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    
+        return posts;
+    }
+    
+    
     /**
      * Handles comments added on posts.
      * See comments on webpage function to see how path variables work here.

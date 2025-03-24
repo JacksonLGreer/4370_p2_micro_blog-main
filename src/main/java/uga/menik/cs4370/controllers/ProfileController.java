@@ -62,7 +62,8 @@ public class ProfileController {
 
         // Following line populates sample data.
         // You should replace it with actual data from the database.
-        List<Post> posts = Utility.createSamplePostsListWithoutComments();
+        //List<Post> posts = Utility.createSamplePostsListWithoutComments();
+        List<Post> posts = userService.getPostsByUserId(userId);
         mv.addObject("posts", posts);
 
         // If an error occured, you can set the following property with the
@@ -76,5 +77,7 @@ public class ProfileController {
         
         return mv;
     }
+
+
     
 }

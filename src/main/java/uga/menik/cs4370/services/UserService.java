@@ -189,5 +189,61 @@ public class UserService {
             
         return bookmarkedPosts;
     }
+    
+    public List<Post> getPostsByUserId(String userId) {
+        List<Post> posts = new ArrayList<>();
+    
+        String query = """
+            SELECT p.postId, p.userId, p.postDate, p.postText, 
+                   u.username, u.firstName, u.lastName,
+                   (SELECT COUNT(*) FROM heart h WHERE h.postId = p.postId) AS heartsCount,
+                   (SELECT COUNT(*) FROM comment c WHERE c.postId = p.postId) AS commentsCount,
+                   EXISTS (SELECT 1 FROM heart h WHERE h.postId = p.postId AND h.userId = ?) AS isHearted,
+                   EXISTS (SELECT 1 FROM bookmark b WHERE b.postId = p.postId AND b.userId = ?) AS isBookmarked
+            FROM post p
+            JOIN user u ON p.userId = u.userId
+            WHERE p.userId = ?
+            ORDER BY p.postDate DESC
+        """;
+    
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(query)) {
+    
+            // Set the current user's ID for isHearted and isBookmarked flags
+            String currentUserId = getLoggedInUser() != null ? getLoggedInUser().getUserId() : "0";
+            pstmt.setString(1, currentUserId);
+            pstmt.setString(2, currentUserId);
+            pstmt.setString(3, userId);
+    
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    User postUser = new User(
+                        rs.getString("userId"),
+                        rs.getString("username"),
+                        rs.getString("firstName"),
+                        rs.getString("lastName")
+                    );
+    
+                    Post post = new Post(
+                        rs.getString("postId"),
+                        rs.getString("postText"),
+                        rs.getString("postDate"),
+                        postUser,
+                        rs.getInt("heartsCount"),
+                        rs.getInt("commentsCount"),
+                        rs.getBoolean("isHearted"),
+                        rs.getBoolean("isBookmarked")
+                    );
+    
+                    posts.add(post);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    
+        return posts;
+    }
+    
 
 }
