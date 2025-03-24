@@ -67,4 +67,41 @@ public class PeopleService {
         return followableUsers;
     }
 
+    public List<FollowableUser> getAllUsersExceptCurrent(String loggedInUserId) {
+        List<FollowableUser> users = new ArrayList<FollowableUser>();
+
+        String query = """
+            SELECT u.userId, u.username, u.firstName, u.lastName,
+                EXISTS (SELECT 1 FROM follow f WHERE f.followerUserId = ? AND f.followeeUserId = u.userId) AS isFollowed,
+                COALESCE((SELECT MAX(p.postDate) FROM post p WHERE p.userId = u.userId), 'Never') AS lastActiveDate
+            FROM `user` u
+            WHERE userId != ?
+            ORDER BY lastActiveDate DESC, firstName, lastName
+        """;
+
+        try (Connection conn = dataSource.getConnection();
+            PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+                pstmt.setString(1, loggedInUserId);
+                pstmt.setString(2, loggedInUserId);
+
+                ResultSet rs = pstmt.executeQuery();
+
+                while (rs.next()) {
+                    users.add(new FollowableUser( 
+                        rs.getString("userId"),
+                        rs.getString("firstName"),
+                        rs.getString("lastName"),
+                        rs.getBoolean("isFollowed"),
+                        rs.getString("lastActiveDate")
+                    ));
+                }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return users;
+    }
+
 }

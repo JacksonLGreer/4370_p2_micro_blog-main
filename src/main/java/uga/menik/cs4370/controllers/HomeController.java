@@ -59,12 +59,17 @@ public class HomeController {
      */
     @GetMapping
     public ModelAndView webpage(@RequestParam(name = "error", required = false) String error) {
+        // get current User
+        User user = userService.getLoggedInUser();
+        
         // See notes on ModelAndView in BookmarksController.java.
         ModelAndView mv = new ModelAndView("home_page");
 
         // Following line populates sample data.
         // You should replace it with actual data from the database.
-        List<Post> posts = Utility.createSamplePostsListWithoutComments();
+        //List<Post> posts = Utility.createSamplePostsListWithoutComments();
+        List<Post> posts = getFollowedUsersPosts(user.getUserId());
+
         mv.addObject("posts", posts);
 
         // If an error occured, you can set the following property with the
@@ -160,6 +165,58 @@ public class HomeController {
             hashtags.add(mat.group(1));
         }
         return hashtags;
+    }
+
+    public List<Post> getFollowedUsersPosts(String userId) {
+        List<Post> posts = new ArrayList<Post>();
+
+        String query = """
+                SELECT p.postId, p.postText, p.postDate, u.userId, u.username, u.firstName, u.lastName,
+                    (SELECT COUNT(*) FROM heart h WHERE h.postId = p.postId) AS heartsCount,
+                    (SELECT COUNT(*) FROM comment c WHERE c.postId = p.postId) AS commentsCount,
+                    EXISTS (SELECT 1 FROM heart h WHERE h.postId = p.postId AND h.userId = ?) AS isHearted,
+                    EXISTS (SELECT 1 FROM bookmark b WHERE b.postId = p.postId AND b.userId = ?) AS isBookmarked
+                FROM post p
+                JOIN follow f ON p.userId = f.followeeUserId
+                JOIN user u ON p.userId = u.userId
+                WHERE f.followerUserId = ?
+                ORDER BY p.postDate DESC
+                """;
+
+                try (Connection conn = dataSource.getConnection();
+                    PreparedStatement pstmt = conn.prepareStatement(query)) {
+                        pstmt.setString(1, userId);
+                        pstmt.setString(2, userId);
+                        pstmt.setString(3, userId);
+
+                        ResultSet rs = pstmt.executeQuery();
+
+                        while (rs.next()) {
+                            User postUser = new User(
+                                rs.getString("userId"), 
+                                rs.getString("username"), 
+                                rs.getString("firstName"), 
+                                rs.getString("lastName")
+                            );
+
+                            Post post = new Post( 
+                                rs.getString("postId"),
+                                rs.getString("postText"),
+                                rs.getString("postDate"),
+                                postUser,
+                                rs.getInt("heartsCount"),
+                                rs.getInt("commentsCount"),
+                                rs.getBoolean("isHearted"),
+                                rs.getBoolean("isBookmarked")
+                            );
+                            posts.add(post);
+
+                        }
+                    } catch (SQLException e) {
+                        e.printStackTrace();
+                    }
+
+        return posts;
     }
 
 }

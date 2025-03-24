@@ -59,7 +59,7 @@ public class PeopleController {
         // Use UserService to access logged in userId to exclude.
         User loggedInUser = userService.getLoggedInUser();
         String userId = loggedInUser.getUserId();
-        List<FollowableUser> followableUsers = peopleService.getFollowableUsers(userId);
+        List<FollowableUser> followableUsers = peopleService.getAllUsersExceptCurrent(userId);
         mv.addObject("users", followableUsers);
 
         // If an error occured, you can set the following property with the
