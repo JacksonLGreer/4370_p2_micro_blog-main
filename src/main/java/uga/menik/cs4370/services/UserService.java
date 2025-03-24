@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.*;
 
 import javax.sql.DataSource;
 
@@ -17,6 +18,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.annotation.SessionScope;
 
+import uga.menik.cs4370.models.Post;
 import uga.menik.cs4370.models.User;
 
 /**
@@ -129,6 +131,57 @@ public class UserService {
             int rowsAffected = registerStmt.executeUpdate();
             return rowsAffected > 0;
         }
+    }
+
+    /**
+     * Gets all of the posts that a user has bookamrked
+     * @param userId
+     * @return
+     */
+    public List<Post> getBookmarkedPosts(String userId) {
+        List<Post> bookmarkedPosts = new ArrayList<Post>();
+
+        String query = """
+            SELECT p.postId, p.userId, p.postDate, p.postText, u.username, u.firstName, u.lastName
+            FROM bookmark b
+            JOIN post p ON b.postId = p.postId
+            JOIN user u ON p.userId = u.userId
+            WHERE b.userId = ?
+            ORDER BY p.postDate DESC
+        """;
+
+        try (Connection conn = dataSource.getConnection();
+        PreparedStatement pstmt = conn.prepareStatement(query)) {
+
+            pstmt.setString(1, userId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    User postUser = new User(
+                        rs.getString("userId"), 
+                        rs.getString("username"), 
+                        rs.getString("firstName"), 
+                        rs.getString("lastName")
+                    );
+
+                    Post post = new Post( 
+                        rs.getString("postId"),
+                        rs.getString("postText"),
+                        rs.getString("postDate"),
+                        postUser,
+                        rs.getInt("heartsCount"),
+                        rs.getInt("commentsCount"),
+                        rs.getBoolean("isHearted"),
+                        rs.getBoolean("isBookmarked")
+                    );
+                    bookmarkedPosts.add(post);
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+            
+        return bookmarkedPosts;
     }
 
 }
