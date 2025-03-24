@@ -142,7 +142,11 @@ public class UserService {
         List<Post> bookmarkedPosts = new ArrayList<Post>();
 
         String query = """
-            SELECT p.postId, p.userId, p.postDate, p.postText, u.username, u.firstName, u.lastName
+            SELECT p.postId, p.userId, p.postDate, p.postText, u.username, u.firstName, u.lastName,
+                (SELECT COUNT(*) FROM heart h WHERE h.postId = p.postId) AS heartsCount,
+                (SELECT COUNT(*) FROM comment c WHERE c.postId = p.postId) AS commentsCount,
+                EXISTS (SELECT 1 FROM heart h WHERE h.postId = p.postId AND h.userId = ?) AS isHearted,
+                EXISTS (SELECT 1 FROM bookmark b WHERE b.postId = p.postId AND b.userId = ?) AS isBookmarked
             FROM bookmark b
             JOIN post p ON b.postId = p.postId
             JOIN user u ON p.userId = u.userId
@@ -154,6 +158,9 @@ public class UserService {
         PreparedStatement pstmt = conn.prepareStatement(query)) {
 
             pstmt.setString(1, userId);
+            pstmt.setString(2, userId);
+            pstmt.setString(3, userId);
+
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     User postUser = new User(

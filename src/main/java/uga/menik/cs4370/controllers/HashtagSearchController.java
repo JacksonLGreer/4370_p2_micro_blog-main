@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,8 +38,10 @@ public class HashtagSearchController {
 
 
     private final DataSource dataSource;
-    public HashtagSearchController(DataSource dataSource) {
+    private final UserService userService;
+    public HashtagSearchController(DataSource dataSource, UserService userService) {
         this.dataSource = dataSource;
+        this.userService = userService;
     }
 
     /**
@@ -68,53 +71,57 @@ public class HashtagSearchController {
         }
         // Creating a dynamic SQL query to get posts that contain all hashtags that were searched
         //
+        String placeholders = String.join(", ", Collections.nCopies(hashtagArray.length, "?"));
         String hashtagQuery = """
-                SELECT p.postId, p.userId, p.postDate, p.postText
+                SELECT p.postId, p.userId, p.postDate, p.postText, u.username, u.firstName, u.lastName,
+                    (SELECT COUNT(*) FROM heart h WHERE h.postId = p.postId) AS heartsCount,
+                    (SELECT COUNT(*) FROM comment c WHERE c.postId = p.postId) AS commentsCount,
+                    EXISTS (SELECT 1 FROM heart WHERE heart.postId = p.postId AND heart.userId = ?) AS isHearted,
+                    EXISTS (SELECT 1 FROM bookmark WHERE bookmark.postId = p.postId AND bookmark.userId = ?) AS isBookmarked
                 FROM post p
-                WHERE p.postId IN (
-                    SELECT postId FROM hashtag WHERE hashTag = ?
-                """;
-        // Adding extra JOINs for each hashtag
-        for (int i = 1; i < hashtagArray.length; i++) {
-            hashtagQuery += """
-                    INTERSECT
-                    SELECT postId FROM hashtag WHERE hashTag = ?
-                    """;
-        } // for
-
-        // Close the query
-        hashtagQuery += ") ORDER BY p.postDate DESC";
+                JOIN `user` u ON p.userId = u.userId
+                JOIN hashtag h ON p.postId = h.postId
+                WHERE h.hashTag IN (""" + placeholders +") GROUP BY p.postId HAVING COUNT(DISTINCT h.hashtag) = ? ORDER BY p.postDate DESC";
+        
+        System.out.println(hashtagQuery);
+       
 
         // List for holding the posts that meet the criteria
         List<Post> posts = new ArrayList<Post>();
 
+        String userId = userService.getLoggedInUser().getUserId();
+
         try (Connection conn = dataSource.getConnection();
             PreparedStatement pstmt = conn.prepareStatement(hashtagQuery)) {
                 
-                for (int i = 0; i < hashtagArray.length; i++) {
-                    pstmt.setString(i + 1, hashtagArray[i]);
-                } // for
+                int index = 1;
+                pstmt.setString(index++, userId);
+                pstmt.setString(index++, userId);
+                for (String hashtag : hashtagArray) {
+                    pstmt.setString(index++, hashtag);
+                }
+                pstmt.setInt(index, hashtagArray.length);
 
                 ResultSet rs = pstmt.executeQuery();
                 while (rs.next()) {
                     // This part needs to be fixed
-                    User postUser = new User(
-                                rs.getString("userId"), 
-                                rs.getString("username"), 
-                                rs.getString("firstName"), 
-                                rs.getString("lastName")
-                            );
+                    User user = new User(
+                        rs.getString("userId"), 
+                        rs.getString("username"), 
+                        rs.getString("firstName"), 
+                        rs.getString("lastName")
+                    );
 
-                            Post post = new Post( 
-                                rs.getString("postId"),
-                                rs.getString("postText"),
-                                rs.getString("postDate"),
-                                postUser,
-                                rs.getInt("heartsCount"),
-                                rs.getInt("commentsCount"),
-                                rs.getBoolean("isHearted"),
-                                rs.getBoolean("isBookmarked")
-                            );
+                    Post post = new Post( 
+                        rs.getString("postId"),
+                        rs.getString("postText"),
+                        rs.getString("postDate"),
+                        user,
+                        rs.getInt("heartsCount"),
+                        rs.getInt("commentsCount"),
+                        rs.getBoolean("isHearted"),
+                        rs.getBoolean("isBookmarked")
+                    );
                     posts.add(post);
                 }
         } catch (SQLException e) {
