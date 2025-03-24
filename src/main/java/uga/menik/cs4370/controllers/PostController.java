@@ -105,9 +105,8 @@ public class PostController {
 
             if (postRs.next()) {
                 User user = new User(
-                    postRs.getString("userId"),
-                    postRs.getString("username"),
-                    postRs.getString("firstName"),
+                    postRs.getString("userId"), 
+                    postRs.getString("firstName"), 
                     postRs.getString("lastName")
                 );
 
@@ -118,9 +117,8 @@ public class PostController {
 
                 while (commentRs.next()) {
                     User commentUser = new User(
-                        commentRs.getString("userId"),
-                        commentRs.getString("username"),
-                        commentRs.getString("firstName"),
+                        commentRs.getString("userId"), 
+                        commentRs.getString("firstName"), 
                         commentRs.getString("lastName")
                     );
 

@@ -165,7 +165,6 @@ public class UserService {
                 while (rs.next()) {
                     User postUser = new User(
                         rs.getString("userId"), 
-                        rs.getString("username"), 
                         rs.getString("firstName"), 
                         rs.getString("lastName")
                     );
